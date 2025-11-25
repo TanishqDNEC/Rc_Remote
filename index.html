@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RC Car Remote</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            background: #f0f0f0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn.pressed {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .empty {
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .stop-btn {
+            grid-column: 2;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .speed-control {
+            margin-top: 20px;
+        }
+
+        .speed-control h3 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .speed-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .speed-btn {
+            padding: 12px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .speed-btn:active {
+            transform: scale(0.95);
+        }
+
+        .speed-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .info {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚗 RC Car Remote</h1>
+        <div class="status" id="status">Ready to connect</div>
+
+        <div class="controls">
+            <div class="empty"></div>
+            <button class="control-btn" data-command="forward" title="Forward">▲</button>
+            <div class="empty"></div>
+
+            <button class="control-btn" data-command="left" title="Turn Left">◄</button>
+            <button class="control-btn stop-btn" onclick="sendCommand('STOP')" title="Stop">STOP</button>
+            <button class="control-btn" data-command="right" title="Turn Right">►</button>
+
+            <button class="control-btn" data-command="swipeLeft" title="Swipe Left">↙</button>
+            <button class="control-btn" data-command="backward" title="Backward">▼</button>
+            <button class="control-btn" data-command="swipeRight" title="Swipe Right">↘</button>
+        </div>
+
+        <div class="speed-control">
+            <h3>Speed Control</h3>
+            <div class="speed-buttons">
+                <button class="speed-btn" onclick="setSpeed('G1', 1)">1</button>
+                <button class="speed-btn" onclick="setSpeed('G2', 2)">2</button>
+                <button class="speed-btn" onclick="setSpeed('G3', 3)">3</button>
+                <button class="speed-btn" onclick="setSpeed('G4', 4)">4</button>
+                <button class="speed-btn active" onclick="setSpeed('G5', 5)">5</button>
+            </div>
+        </div>
+
+        <div class="info">
+            📡 Connect to WiFi: <strong>mpmc</strong><br>
+            Password: <strong>tanishq</strong><br>
+            IP: <strong>192.168.4.1</strong>
+        </div>
+    </div>
+
+    <script>
+        const CAR_IP = '192.168.4.1';
+        let currentSpeed = 5;
+        let activeCommand = null;
+        let pressedKeys = new Set();
+
+        function updateStatus(message, isSuccess = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status' + (isSuccess ? ' active' : '');
+        }
+
+        function sendCommand(command) {
+            fetch(`http://${CAR_IP}/${command}`, {
+                method: 'GET',
+                mode: 'no-cors'
+            })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function startCommand(command) {
+            if (activeCommand !== command) {
+                activeCommand = command;
+                sendCommand(command);
+                updateStatus(`▶ ${command}`, true);
+            }
+        }
+
+        function stopCommand() {
+            if (activeCommand) {
+                activeCommand = null;
+                sendCommand('STOP');
+                updateStatus('⏸ Stopped');
+            }
+        }
+
+        function setSpeed(gear, level) {
+            currentSpeed = level;
+
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            sendCommand(gear);
+            updateStatus(`Speed set to ${level}`, true);
+            setTimeout(() => {
+                if (!activeCommand) updateStatus('Ready', true);
+            }, 1500);
+        }
+
+        // Mouse/Touch events for control buttons
+        document.querySelectorAll('.control-btn[data-command]').forEach(button => {
+            const command = button.getAttribute('data-command');
+
+            // Mouse events
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                button.classList.add('pressed');
+                startCommand(command);
+            });
+
+            button.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                button.classList.remove('pressed');
+                stopCommand();
+            });
+
+            button.addEventListener('mouseleave', (e) => {
+                button.classList.remove('pressed');
+                if (activeCommand === command) {
+                    stopCommand();
+                }
+            });
+
+            // Touch events for mobile
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                button.classList.add('pressed');
+                startCommand(command);
+            });
+
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                button.classList.remove('pressed');
+                stopCommand();
+            });
+
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                button.classList.remove('pressed');
+                stopCommand();
+            });
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            // Prevent repeated keydown events when key is held
+            if (pressedKeys.has(e.key)) return;
+            pressedKeys.add(e.key);
+
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    e.preventDefault();
+                    startCommand('forward');
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    startCommand('backward');
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    e.preventDefault();
+                    startCommand('right');
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    e.preventDefault();
+                    startCommand('left');
+                    break;
+                case 'q':
+                case 'Q':
+                    e.preventDefault();
+                    startCommand('swipeRight');
+                    break;
+                case 'e':
+                case 'E':
+                    e.preventDefault();
+                    startCommand('swipeLeft');
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    stopCommand();
+                    break;
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                    const speedBtn = document.querySelectorAll('.speed-btn')[parseInt(e.key) - 1];
+                    if (speedBtn) speedBtn.click();
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            pressedKeys.delete(e.key);
+
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                case 'q':
+                case 'Q':
+                case 'e':
+                case 'E':
+                    e.preventDefault();
+                    stopCommand();
+                    break;
+            }
+        });
+
+        // Stop command if window loses focus
+        window.addEventListener('blur', () => {
+            stopCommand();
+            pressedKeys.clear();
+        });
+
+        // Initial status
+        updateStatus('Ready to control', true);
+    </script>
+</body>
+
+</html>
